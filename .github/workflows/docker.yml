@@ -1,23 +1,110 @@
-name: Build e Publicação Docker
+name: CI/CD DevSecOps
 
 on:
   push:
     branches:
       - main
+  pull_request:
+    branches:
+      - main
 
 permissions:
   contents: read
-  packages: write
 
 jobs:
-  docker:
+  seguranca:
+    name: Verificacoes de seguranca
     runs-on: ubuntu-latest
 
     steps:
-      - name: Baixar código
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Gitleaks
+        uses: gitleaks/gitleaks-action@v3
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: SonarCloud
+        uses: SonarSource/sonarqube-scan-action@v7
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+
+      - name: Build da imagem
+        run: docker build -t devops-app:scan .
+
+      - name: Trivy - Relatorio das dependencias
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          scanners: vuln
+          format: table
+          output: trivy-dependencias.txt
+          severity: LOW,MEDIUM,HIGH,CRITICAL
+          exit-code: '0'
+
+      - name: Trivy - Bloqueio das dependencias
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          scanners: vuln
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: '1'
+
+      - name: Trivy - Relatorio da imagem
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: devops-app:scan
+          format: table
+          output: trivy-imagem.txt
+          severity: LOW,MEDIUM,HIGH,CRITICAL
+          exit-code: '0'
+
+      - name: Trivy - Bloqueio da imagem
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: devops-app:scan
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: '1'
+
+      - name: Syft - Gerar SBOM
+        uses: anchore/sbom-action@v0
+        with:
+          image: devops-app:scan
+          format: spdx-json
+          artifact-name: sbom.spdx.json
+
+      - name: Publicar relatorios do Trivy
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: relatorios-trivy
+          path: |
+            trivy-dependencias.txt
+            trivy-imagem.txt
+          if-no-files-found: warn
+
+  publicar:
+    name: Publicar no GHCR
+    needs: seguranca
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Ler versão
+      - name: Ler versao
         id: version
         run: echo "value=$(cat VERSION)" >> "$GITHUB_OUTPUT"
 
