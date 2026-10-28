@@ -1,10 +1,15 @@
-# Docker, GitHub Actions e Container Registry
+# Docker e GitHub Actions
 
-Exercício prático da disciplina de DevOps da UFLA.
+Exercício prático da disciplina de DevOps da UFLA, utilizando FastAPI, Docker e GitHub Actions para automatizar a construção e publicação de imagens no GHCR.
 
-Aplicação FastAPI com endpoint `/hello`, utilizando Docker e GitHub Actions para automatizar o build e a publicação das imagens no GHCR.
+## DevSecOps
 
-## Versões
+O pipeline utiliza Gitleaks para detectar segredos, SonarCloud para análise estática, Trivy para verificar vulnerabilidades e Syft para gerar o SBOM.
 
-- **1.0:** Hello World
-- **2.0:** Hello World 2
+Vulnerabilidades HIGH e CRITICAL com correção disponível, segredos detectados e falhas no Quality Gate bloqueiam o pipeline. As LOW e MEDIUM são registradas em relatórios.
+
+A imagem só é publicada no GHCR após a aprovação das verificações.
+
+## Evidências
+
+[Relatório do trabalho prático](docs/evidencias.pdf)
